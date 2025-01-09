@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>p5.js example</title>
+    <style>
+      body {
+        padding: 0;
+        margin: 0;
+        background-color: #1b1b1b;
+      }
+    </style>
+    <script src="./p5.js"></script>
+    <script>
+        let house, field;
+        const camDistance = 600, camRotateSpeed = 0.5;
+        let camX = 0, camY = -200, camZ = camDistance;
+        let angle = 0;
+
+        function setup() {
+            createCanvas(800, 800, WEBGL);
+            angleMode(DEGREES)
+            frameRate(60)
+
+            cam = createCamera()
+            cam.setPosition(camX, camY, camZ)
+            cam.lookAt(0, 0, 0)
+
+            // normalMaterial()
+
+            house = buildGeometry(() => {
+                push()
+                fill('yellow')
+                box(100)
+                translate(0, -100, 0)
+                rotateY(45)
+                fill('red')
+                cone(100, -100, 5)
+                pop()
+            })
+            field = buildGeometry(() => {
+                push()
+                translate(0, 51, 0)
+                // box(400,1,400)
+                rotateX(90)
+                fill('green')
+                plane(400, 400)
+                pop()
+            })
+            // setInterval(() => {
+            //     console.log(round(frameRate()))
+            // }, 1000)
+
+            background(200);
+            [house, field].forEach(obj => {
+                obj.faces.forEach((face, i) => {
+                    const [p, c] = calculatePointsOnFace(obj, i)
+                    points.push(p)
+                    colors.push(c)
+                })
+                totalFaces += obj.faces.length
+            })
+        }
+
+        let points = []
+        let colors = []
+        let step = 0;
+        let faceIndex = 0;
+        let currentFaces = [];
+        let totalFaces = 0;
+        const facesInSameTime = 3;
+        // both speed index have to be integer, higer frame skip slows down, higher steps increment accelerates
+        const speedIndexFrameSkip = 1;
+        const speedIndexStepsIncrement = 1;
+        const distanceBetweenPoints = 20;
+
+        function draw() {
+            orbitControl()
+            background(200);
+
+            /*
+            TODO
+            zwielokrotnić żeby było kilka ścian jednoczesnie
+            połączyć punkty w linie (może uda zmienić się kolejność żeby to była nieprzerwana linia)
+            usunąc duplikaty ścian jeśli mogą być nie widoczne
+             */
+            for (let f = 0; f <= faceIndex; f++) {
+                const lastStep = f === faceIndex ? step : points[f].length
+                for (let i = 0; i < lastStep; i++) {
+                    drawPoint(points[f][i], colors[f])
+                }
+            }
+            if (frameCount % speedIndexFrameSkip === 0) {
+                step += speedIndexStepsIncrement
+                if (step >= points[faceIndex]?.length) {
+                    faceIndex++
+                    step = 0
+                }
+                if (faceIndex >= totalFaces) {
+                    faceIndex = 0
+                }
+            }
+
+            // if(faceIndex >= house.faces.length) {
+            //     background(200);
+            //     faceIndex = 0
+            // }
+
+            // let face = house.faces.at(faceIndex)
+            // let vertices = house.vertices.filter((v, i) => face.includes(i))
+
+
+            // let v = house.vertices.at(i % house.vertices.length)
+            // drawPoint(v)
+            // if(frameCount % 60 === 0)
+            //     i = (i+1)
+
+
+            // pointLight(255, 255, 255, 0, -200, 300)
+            // cam.setPosition(camDistance * cos(frameCount * camRotateSpeed), camY, camDistance * sin(frameCount * camRotateSpeed));
+            // cam.lookAt(0, 0, 0);
+            // model(house)
+            // model(field)
+        }
+
+        function calculatePointsOnFace(obj = field, index) {
+            const face = obj.faces.at(index)
+            const vertices = new Array(face.length)
+            let r = 0, g = 0, b = 0, a = 0
+            for (let i = 0; i < face.length; i++) {
+                const vertexIndex = face[i]
+                vertices[i] = obj.vertices[vertexIndex]
+                r += obj.vertexColors[vertexIndex * 4]
+                g += obj.vertexColors[vertexIndex * 4 + 1]
+                b += obj.vertexColors[vertexIndex * 4 + 2]
+                a += obj.vertexColors[vertexIndex * 4 + 3]
+            }
+            return [getPlanePoints(vertices), [r / face.length * 255, g / face.length * 255, b / face.length * 255, a / face.length * 255]]
+        }
+
+        function getPlanePoints(vertices) {
+            const points = [];
+            const [v0, v1, v2] = vertices;
+
+            const maxEdgeLength = Math.max(
+                dist(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z),
+                dist(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z),
+                dist(v2.x, v2.y, v2.z, v0.x, v0.y, v0.z)
+            );
+            const density = Math.ceil(maxEdgeLength / distanceBetweenPoints);
+
+            for (let i = 0; i <= density; i++) {
+                for (let j = 0; j <= density - i; j++) {
+                    const u = i / density;
+                    const v = j / density;
+                    const w = 1 - u - v;
+
+                    const x = u * v0.x + v * v1.x + w * v2.x;
+                    const y = u * v0.y + v * v1.y + w * v2.y;
+                    const z = u * v0.z + v * v1.z + w * v2.z;
+
+                    points.push({x, y, z});
+                }
+            }
+
+            return points;
+        }
+
+        function drawPoint(v, color) {
+            push()
+            fill(color)
+            stroke(color)
+            translate(v.x, v.y, v.z)
+            sphere(5)
+            pop()
+        }
+    </script>
+</head>
+<body>
+
+</body>
+</html>
