@@ -83,7 +83,7 @@
             /*
             TODO
             zwielokrotnić żeby było kilka ścian jednoczesnie
-            połączyć punkty w linie (może uda zmienić się kolejność żeby to była nieprzerwana linia)
+            połączyć punkty w linie
             usunąc duplikaty ścian jeśli mogą być nie widoczne
              */
             for (let f = 0; f <= faceIndex; f++) {
@@ -152,20 +152,29 @@
             const density = Math.ceil(maxEdgeLength / distanceBetweenPoints);
 
             for (let i = 0; i <= density; i++) {
-                for (let j = 0; j <= density - i; j++) {
-                    const u = i / density;
-                    const v = j / density;
-                    const w = 1 - u - v;
-
-                    const x = u * v0.x + v * v1.x + w * v2.x;
-                    const y = u * v0.y + v * v1.y + w * v2.y;
-                    const z = u * v0.z + v * v1.z + w * v2.z;
-
-                    points.push({x, y, z});
-                }
+                if (i % 2 === 0)
+                    for (let j = 0; j <= density - i; j++) {
+                        points.push(calculatePoint(v0, v1, v2, density, i, j));
+                    }
+                else
+                    for (let j = density - i; j >= 0; j--) {
+                        points.push(calculatePoint(v0, v1, v2, density, i, j));
+                    }
             }
 
             return points;
+        }
+
+        function calculatePoint(v0, v1, v2, density, i, j) {
+            const u = i / density;
+            const v = j / density;
+            const w = 1 - u - v;
+
+            const x = u * v0.x + v * v1.x + w * v2.x;
+            const y = u * v0.y + v * v1.y + w * v2.y;
+            const z = u * v0.z + v * v1.z + w * v2.z;
+
+            return {x, y, z}
         }
 
         function drawPoint(v, color) {
