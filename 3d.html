@@ -55,21 +55,23 @@
 
             background(200);
             [house, field].forEach(obj => {
-                obj.faces.forEach((face, i) => {
-                    const [p, c] = calculatePointsOnFace(obj, i)
-                    points.push(p)
-                    colors.push(c)
+                obj.faces.reduce((arr, el) => {
+                    if (arr.some(x => x.every(v => el.includes(v)) && x.length === el.length)) {
+                        return arr
+                    }
+                    return [...arr, el]
+                }, []).forEach((face, i) => {
+                    faces.push(calculatePointsOnFace(obj, i))
                 })
-                totalFaces += obj.faces.length
             })
         }
 
+        let faces = []
         let points = []
         let colors = []
         let step = 0;
         let faceIndex = 0;
         let currentFaces = [];
-        let totalFaces = 0;
         const facesInSameTime = 3;
         // both speed index have to be integer, higer frame skip slows down, higher steps increment accelerates
         const speedIndexFrameSkip = 1;
@@ -87,18 +89,18 @@
             usunąc duplikaty ścian jeśli mogą być nie widoczne
              */
             for (let f = 0; f <= faceIndex; f++) {
-                const lastStep = f === faceIndex ? step : points[f].length
+                const lastStep = f === faceIndex ? step : faces[f].points.length
                 for (let i = 0; i < lastStep; i++) {
-                    drawPoint(points[f][i], colors[f])
+                    drawPoint(faces[f].points[i], faces[f].color)
                 }
             }
             if (frameCount % speedIndexFrameSkip === 0) {
                 step += speedIndexStepsIncrement
-                if (step >= points[faceIndex]?.length) {
+                if (step >= faces[faceIndex].points.length) {
                     faceIndex++
                     step = 0
                 }
-                if (faceIndex >= totalFaces) {
+                if (faceIndex >= faces.length) {
                     faceIndex = 0
                 }
             }
@@ -125,7 +127,7 @@
             // model(field)
         }
 
-        function calculatePointsOnFace(obj = field, index) {
+        function calculatePointsOnFace(obj, index) {
             const face = obj.faces.at(index)
             const vertices = new Array(face.length)
             let r = 0, g = 0, b = 0, a = 0
@@ -137,7 +139,10 @@
                 b += obj.vertexColors[vertexIndex * 4 + 2]
                 a += obj.vertexColors[vertexIndex * 4 + 3]
             }
-            return [getPlanePoints(vertices), [r / face.length * 255, g / face.length * 255, b / face.length * 255, a / face.length * 255]]
+            return {
+                points: getPlanePoints(vertices),
+                color: [r / face.length * 255, g / face.length * 255, b / face.length * 255, a / face.length * 255]
+            }
         }
 
         function getPlanePoints(vertices) {
