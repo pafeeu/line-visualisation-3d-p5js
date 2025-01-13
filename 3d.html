@@ -46,15 +46,16 @@
                 // box(400,1,400)
                 rotateX(90)
                 fill('green')
-                plane(400, 400)
+                // plane(400, 400)
+                plane(200, 200)
                 pop()
             })
-            // setInterval(() => {
-            //     console.log(round(frameRate()))
-            // }, 1000)
+            setInterval(() => {
+                console.log(round(frameRate()))
+            }, 1000)
 
             background(200);
-            [house, field].forEach(obj => {
+            [ field].forEach(obj => {
                 obj.faces.reduce((arr, el) => {
                     if (arr.some(x => x.every(v => el.includes(v)) && x.length === el.length)) {
                         return arr
@@ -64,6 +65,9 @@
                     faces.push(calculatePointsOnFace(obj, i))
                 })
             })
+            // console.log(faces[0].points)
+            // strokeWeight(lineWidth)
+            // drawLine(faces[0].points.slice(-3))
         }
 
         let faces = []
@@ -76,23 +80,33 @@
         // both speed index have to be integer, higer frame skip slows down, higher steps increment accelerates
         const speedIndexFrameSkip = 1;
         const speedIndexStepsIncrement = 1;
-        const distanceBetweenPoints = 20;
+        const lineWidth = 5;
+        const linesGap = 5;
+        const distanceBetweenPoints = lineWidth + linesGap;
 
         function draw() {
             orbitControl()
             background(200);
+            noFill();
+            strokeWeight(lineWidth)
+            // return;
 
             /*
             TODO
             zwielokrotnić żeby było kilka ścian jednoczesnie
-            połączyć punkty w linie
-            usunąc duplikaty ścian jeśli mogą być nie widoczne
              */
             for (let f = 0; f <= faceIndex; f++) {
+                stroke(faces[f].color)
+                beginShape();
                 const lastStep = f === faceIndex ? step : faces[f].points.length
                 for (let i = 0; i < lastStep; i++) {
-                    drawPoint(faces[f].points[i], faces[f].color)
+                    const v = faces[f].points[i]
+                    // bezierVertex()
+                    curveVertex(v.x, v.y, v.z)
+                    // drawLine(faces[f].points.slice(i, i + 4))
+                    // drawPoint(faces[f].points[i], faces[f].color)
                 }
+                endShape();
             }
             if (frameCount % speedIndexFrameSkip === 0) {
                 step += speedIndexStepsIncrement
@@ -149,21 +163,25 @@
             const points = [];
             const [v0, v1, v2] = vertices;
 
-            const maxEdgeLength = Math.max(
+            const edgesLengths = [
                 dist(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z),
                 dist(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z),
                 dist(v2.x, v2.y, v2.z, v0.x, v0.y, v0.z)
-            );
+            ]
+
+            const maxEdgeLength = Math.max(...edgesLengths);
+            const maxEdgeIndex = edgesLengths.indexOf(maxEdgeLength);
+            const newVertices =  maxEdgeIndex === 0 ? [v0, v1, v2] : maxEdgeIndex === 1 ? [v1, v2, v0] : [v2, v0, v1]
             const density = Math.ceil(maxEdgeLength / distanceBetweenPoints);
 
             for (let i = 0; i <= density; i++) {
                 if (i % 2 === 0)
                     for (let j = 0; j <= density - i; j++) {
-                        points.push(calculatePoint(v0, v1, v2, density, i, j));
+                        points.push(calculatePoint(...newVertices, density, i, j));
                     }
                 else
                     for (let j = density - i; j >= 0; j--) {
-                        points.push(calculatePoint(v0, v1, v2, density, i, j));
+                        points.push(calculatePoint(...newVertices, density, i, j));
                     }
             }
 
@@ -182,12 +200,18 @@
             return {x, y, z}
         }
 
+        function drawLine(points) {
+            const additional = points.length < 4 ? Array.from({length: 4 - points.length})
+                .map(() => points.at(-1)).flatMap(p => [p.x, p.y, p.z]) : []
+            curve(...points.flatMap(p => [p.x, p.y, p.z]), ...additional)
+        }
+
         function drawPoint(v, color) {
             push()
             fill(color)
             stroke(color)
             translate(v.x, v.y, v.z)
-            sphere(5)
+            sphere(lineWidth / 2)
             pop()
         }
     </script>
