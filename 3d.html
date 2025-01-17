@@ -16,13 +16,13 @@
     <script>
         let house, field;
         const camDistance = 600, camRotateSpeed = 0.5;
-        let camX = 0, camY = -200, camZ = camDistance;
+        let camX = 0, camY = -300, camZ = 200;
         let angle = 0;
 
         function setup() {
             createCanvas(800, 800, WEBGL);
             angleMode(DEGREES)
-            frameRate(60)
+            frameRate(50)
 
             cam = createCamera()
             cam.setPosition(camX, camY, camZ)
@@ -50,13 +50,13 @@
                 plane(200, 200)
                 pop()
             })
-            setInterval(() => {
-                console.log(round(frameRate()))
-            }, 1000)
+            // setInterval(() => {
+            //     console.log(round(frameRate()))
+            // }, 1000)
 
             background(200);
-            [ field].forEach(obj => {
-                obj.faces.reduce((arr, el) => {
+            [field].forEach(obj => {
+                obj.faces.slice(1).reduce((arr, el) => {
                     if (arr.some(x => x.every(v => el.includes(v)) && x.length === el.length)) {
                         return arr
                     }
@@ -84,12 +84,27 @@
         const linesGap = 5;
         const distanceBetweenPoints = lineWidth + linesGap;
 
+        const DRAW_POINTS_INSTEAD_OF_ANIMATION = true;
+
         function draw() {
             orbitControl()
             background(200);
             noFill();
             strokeWeight(lineWidth)
-            // return;
+
+            if (DRAW_POINTS_INSTEAD_OF_ANIMATION) {
+                strokeWeight(1)
+                for (let f = 0; f < faces.length; f++) {
+                    beginShape();
+                    for (let i = 0; i < faces[f].points.length; i++) {
+                        const v = faces[f].points[i]
+                        // curveVertex(v.x, v.y, v.z)
+                        drawPoint(v, v.color)
+                    }
+                    endShape();
+                }
+                return;
+            }
 
             /*
             TODO
@@ -101,9 +116,7 @@
                 const lastStep = f === faceIndex ? step : faces[f].points.length
                 for (let i = 0; i < lastStep; i++) {
                     const v = faces[f].points[i]
-                    // bezierVertex()
                     curveVertex(v.x, v.y, v.z)
-                    // drawLine(faces[f].points.slice(i, i + 4))
                     // drawPoint(faces[f].points[i], faces[f].color)
                 }
                 endShape();
@@ -119,22 +132,6 @@
                 }
             }
 
-            // if(faceIndex >= house.faces.length) {
-            //     background(200);
-            //     faceIndex = 0
-            // }
-
-            // let face = house.faces.at(faceIndex)
-            // let vertices = house.vertices.filter((v, i) => face.includes(i))
-
-
-            // let v = house.vertices.at(i % house.vertices.length)
-            // drawPoint(v)
-            // if(frameCount % 60 === 0)
-            //     i = (i+1)
-
-
-            // pointLight(255, 255, 255, 0, -200, 300)
             // cam.setPosition(camDistance * cos(frameCount * camRotateSpeed), camY, camDistance * sin(frameCount * camRotateSpeed));
             // cam.lookAt(0, 0, 0);
             // model(house)
@@ -171,19 +168,76 @@
 
             const maxEdgeLength = Math.max(...edgesLengths);
             const maxEdgeIndex = edgesLengths.indexOf(maxEdgeLength);
-            const newVertices =  maxEdgeIndex === 0 ? [v0, v1, v2] : maxEdgeIndex === 1 ? [v1, v2, v0] : [v2, v0, v1]
+            const newVertices = maxEdgeIndex === 0 ? [v0, v1, v2] : maxEdgeIndex === 1 ? [v1, v2, v0] : [v2, v0, v1]
             const density = Math.ceil(maxEdgeLength / distanceBetweenPoints);
+
+            let lastWasEdge = false;
+
+            const calculate = (i, j) => {
+                // points.push({
+                //     ...calculatePoint(...newVertices, density, i, j),
+                //     color: j === 0 || j === density - i ? 'red' : 'green'
+                // })
+                // return
+                if (i > 0 && points.length > 1 && (j === 0 || j === density - i) && lastWasEdge) {
+                    const last = points.pop()
+                    const newOne = calculatePoint(...newVertices, density, i, j)
+                    points.push({
+                        x: (last.x + newOne.x) / 2,
+                        y: (last.y + newOne.y) / 2,
+                        z: (last.z + newOne.z) / 2,
+                        color: 'red'
+                    })
+                } else
+                    points.push({...calculatePoint(...newVertices, density, i, j), color: 'green'})
+
+                lastWasEdge = j === 0 || j === density - i
+            }
 
             for (let i = 0; i <= density; i++) {
                 if (i % 2 === 0)
-                    for (let j = 0; j <= density - i; j++) {
-                        points.push(calculatePoint(...newVertices, density, i, j));
-                    }
+                    for (let j = 0; j <= density - i; j++)
+                        calculate(i, j)
                 else
-                    for (let j = density - i; j >= 0; j--) {
-                        points.push(calculatePoint(...newVertices, density, i, j));
-                    }
+                    for (let j = density - i; j >= 0; j--)
+                        calculate(i, j)
             }
+
+            // const redIndexes = points.reduce((acc, p, i) => {
+            //     if (p.color === 'red') acc.push(i)
+            //     return acc
+            // }, []).slice(1, -1)
+            //
+            // let lastIndex = 0
+            // const newPoints = []
+            //
+            // for (let i = 0; i < redIndexes.length; i++) {
+            //     if (redIndexes[i] === redIndexes[i + 1] - 1) {
+            //         newPoints.push(...points.slice(lastIndex, redIndexes[i] + 1))
+            //         const before = points[redIndexes[i] - 1]
+            //         const after = points[redIndexes[i + 1] + 1]
+            //         if (!before || !after) break
+            //         newPoints.push({
+            //             x: avg(before.x, after.x, points[redIndexes[i]].x, points[redIndexes[i] + 1].x),
+            //             y: avg(before.y, after.y, points[redIndexes[i]].y, points[redIndexes[i] + 1].y),
+            //             z: avg(before.z, after.z, points[redIndexes[i]].z, points[redIndexes[i] + 1].z),
+            //             color: 'red'
+            //         })
+            //
+            //         i += 1
+            //         lastIndex = i + 1
+            //         break;
+            //     }
+            // }
+            // newPoints.push(...points.slice(lastIndex))
+            // return newPoints
+
+
+            // for(let i = 0; i < points.length; i++) {
+            //     const p = points[i]
+            //     if(p.color!=='red' || i === 0 || i === points.length - 1) break
+            //     const prev = points[i - 1]
+            // }
 
             return points;
         }
@@ -211,8 +265,12 @@
             fill(color)
             stroke(color)
             translate(v.x, v.y, v.z)
-            sphere(lineWidth / 2)
+            sphere(1)
             pop()
+        }
+
+        function avg(...arr) {
+            return arr.reduce((acc, el) => acc + el, 0) / arr.length
         }
     </script>
 </head>
