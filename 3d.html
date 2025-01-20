@@ -18,8 +18,13 @@
         const camDistance = 600, camRotateSpeed = 0.5;
         let camX = 0, camY = -300, camZ = 200;
         let angle = 0;
+        let font;
 
         let currentFrameRate = 60
+
+        function preload() {
+            font = loadFont('/inconsolata.otf');
+        }
 
         function setup() {
             createCanvas(800, 800, WEBGL);
@@ -90,7 +95,7 @@
         const linesGap = 5;
         const distanceBetweenPoints = lineWidth + linesGap;
 
-        const DRAW_POINTS_INSTEAD_OF_ANIMATION = false;
+        const DRAW_POINTS_INSTEAD_OF_ANIMATION = true;
         const DO_NOT_SLOW_DOWN_WITH_FRAME_RATE = false;
 
         function draw() {
@@ -108,6 +113,7 @@
                         const v = usedFaces[f].points[i]
                         // curveVertex(v.x, v.y, v.z)
                         drawPoint(v, v.color)
+                        drawText(i, v)
                     }
                     endShape();
                 }
@@ -182,15 +188,12 @@
 
         function simplifyPointsOnFace(face) {
             const points = face.points
-            const newPoints = [points[0]]
+            // const newPoints = [points[0]]
             const newIndexes = []
+            const removeIndexes = []
             for (let i = 0; i < points.length; i++) {
-                if (i < points.length - 1 && i > 0) {
-                    if (!areCollinear3D(points[i - 1], points[i], points[i + 1]))
-                        newIndexes.push(i)
-                } else {
-                    newIndexes.push(i)
-                }
+                if (i < points.length - 1 && i > 0 && areCollinear3D(points[i - 1], points[i], points[i + 1]))
+                    removeIndexes.push(i)
             }
 
             // for (let i = 0; i < points.length; i++) {
@@ -215,11 +218,31 @@
             // }
             // newPoints.push(points.at(-1));
 
+            const adjustedIndexes = [];
+            let seriesStart = null;
+
+            for (let i = 0; i < removeIndexes.length; i++) {
+                if (seriesStart === null) {
+                    // Początek serii
+                    seriesStart = removeIndexes[i];
+                }
+
+                // Jeśli koniec serii (kolejny indeks nie jest ciągły) lub ostatni element
+                if (removeIndexes[i + 1] !== removeIndexes[i] + 1) {
+                    // Dodaj wszystkie poza pierwszym i ostatnim z serii
+                    for (let j = seriesStart + 1; j < removeIndexes[i]; j++) {
+                        adjustedIndexes.push(j);
+                    }
+                    seriesStart = null; // Zresetuj serię
+                }
+            }
+
             return {
                 // points: newPoints,
                 // points: points.filter((_, i) => newIndexes.includes(i) || newIndexes.includes(i+1) || newIndexes.includes(i-1)),
                 // points: newIndexes.flatMap((pi, i, arr) => [arr.at(i - 1) !== pi - 1 ? points.at(pi-1) : false, points.at(pi), arr.at(i + 1) !== pi + 1 ? points.at(pi+1) : false].filter(x => x)),
-                points: points.filter((_, i) => newIndexes.includes(i)),
+                // points: points.filter((_, i) => newIndexes.includes(i)),
+                points: points.filter((_, i) => !adjustedIndexes.includes(i)),
                 color: face.color
             }
         }
@@ -342,6 +365,17 @@
             const additional = points.length < 4 ? Array.from({length: 4 - points.length})
                 .map(() => points.at(-1)).flatMap(p => [p.x, p.y, p.z]) : []
             curve(...points.flatMap(p => [p.x, p.y, p.z]), ...additional)
+        }
+
+        function drawText(i, v) {
+            push(); // Zapamiętanie aktualnych ustawień stylu
+            fill('black'); // Kolor tekstu (np. czerwony)
+            noStroke(); // Usunięcie obramowania tekstu
+            textFont(font);
+            textSize(6); // Rozmiar tekstu
+            translate(v.x, v.y, v.z); // Przesunięcie do punktu
+            text(i, 0, 5); // Tekst z przesunięciem obok punktu
+            pop(); // Przywrócenie wcześniejszych ustawień stylu
         }
 
         function drawPoint(v, color) {
