@@ -19,10 +19,12 @@
         let camX = 0, camY = -300, camZ = 200;
         let angle = 0;
 
+        let currentFrameRate = 60
+
         function setup() {
             createCanvas(800, 800, WEBGL);
             angleMode(DEGREES)
-            frameRate(50)
+            frameRate(currentFrameRate)
 
             cam = createCamera()
             cam.setPosition(camX, camY, camZ)
@@ -50,9 +52,10 @@
                 plane(200, 200)
                 pop()
             })
-            // setInterval(() => {
-            //     console.log(round(frameRate()))
-            // }, 1000)
+            setInterval(() => {
+                currentFrameRate = round(frameRate())
+                // console.log(currentFrameRate)
+            }, 1000)
 
             background(200);
             [field].forEach(obj => {
@@ -62,17 +65,20 @@
                     }
                     return [...arr, el]
                 }, []).forEach((face, i) => {
-                    faces.push(calculatePointsOnFace(obj, i))
+                    let data = calculatePointsOnFace(obj, i)
+                    faces.push(data)
+                    simplifiedFaces.push(simplifyPointsOnFace(data))
                 })
             })
-            // console.log(faces[0].points)
+            totalPoints = faces.reduce((acc, f) => acc + f.points.length, 0)
             // strokeWeight(lineWidth)
             // drawLine(faces[0].points.slice(-3))
         }
 
+        let totalPoints = 0
+
         let faces = []
-        let points = []
-        let colors = []
+        let simplifiedFaces = []
         let step = 0;
         let faceIndex = 0;
         let currentFaces = [];
@@ -84,7 +90,8 @@
         const linesGap = 5;
         const distanceBetweenPoints = lineWidth + linesGap;
 
-        const DRAW_POINTS_INSTEAD_OF_ANIMATION = true;
+        const DRAW_POINTS_INSTEAD_OF_ANIMATION = false;
+        const DO_NOT_SLOW_DOWN_WITH_FRAME_RATE = false;
 
         function draw() {
             orbitControl()
@@ -93,11 +100,12 @@
             strokeWeight(lineWidth)
 
             if (DRAW_POINTS_INSTEAD_OF_ANIMATION) {
+                const usedFaces = simplifiedFaces // faces
                 strokeWeight(1)
-                for (let f = 0; f < faces.length; f++) {
+                for (let f = 0; f < usedFaces.length; f++) {
                     beginShape();
-                    for (let i = 0; i < faces[f].points.length; i++) {
-                        const v = faces[f].points[i]
+                    for (let i = 0; i < usedFaces[f].points.length; i++) {
+                        const v = usedFaces[f].points[i]
                         // curveVertex(v.x, v.y, v.z)
                         drawPoint(v, v.color)
                     }
@@ -111,18 +119,34 @@
             zwielokrotnić żeby było kilka ścian jednoczesnie
              */
             for (let f = 0; f <= faceIndex; f++) {
-                stroke(faces[f].color)
+                const usedFaces = faces // simplifiedFaces
+                stroke(usedFaces[f].color)
                 beginShape();
-                const lastStep = f === faceIndex ? step : faces[f].points.length
+                // if(f < faceIndex)
+                //     then use simplified version of face's points
+                const lastStep = f === faceIndex ? step : usedFaces[f].points.length
                 for (let i = 0; i < lastStep; i++) {
-                    const v = faces[f].points[i]
+                    const v = usedFaces[f].points[i]
                     curveVertex(v.x, v.y, v.z)
                     // drawPoint(faces[f].points[i], faces[f].color)
                 }
                 endShape();
             }
+
+            // step = frameCount % totalPoints
+            // for (faceIndex = 0; faceIndex < faces.length; faceIndex++) {
+            //     if (step < faces[faceIndex].points.length) {
+            //         break;
+            //     }
+            //     step -= faces[faceIndex].points.length
+            // }
+
+
             if (frameCount % speedIndexFrameSkip === 0) {
-                step += speedIndexStepsIncrement
+                if (DO_NOT_SLOW_DOWN_WITH_FRAME_RATE)
+                    step += speedIndexStepsIncrement * (60 / currentFrameRate)
+                else
+                    step += speedIndexStepsIncrement
                 if (step >= faces[faceIndex].points.length) {
                     faceIndex++
                     step = 0
@@ -153,6 +177,50 @@
             return {
                 points: getPlanePoints(vertices),
                 color: [r / face.length * 255, g / face.length * 255, b / face.length * 255, a / face.length * 255]
+            }
+        }
+
+        function simplifyPointsOnFace(face) {
+            const points = face.points
+            const newPoints = [points[0]]
+            const newIndexes = []
+            for (let i = 0; i < points.length; i++) {
+                if (i < points.length - 1 && i > 0) {
+                    if (!areCollinear3D(points[i - 1], points[i], points[i + 1]))
+                        newIndexes.push(i)
+                } else {
+                    newIndexes.push(i)
+                }
+            }
+
+            // for (let i = 0; i < points.length; i++) {
+            //     if (i < points.length - 1 && i > 0 && !areCollinear3D(points[i - 1], points[i], points[i + 1]))
+            //         newPoints.push(points[i])
+            // }
+
+            // let inLine = false;
+            // for (let i = 1; i < points.length - 1; i++) {
+            //     if (!areCollinear3D(points[i - 1], points[i], points[i + 1])) {
+            //         // Jeśli punkt nie jest współliniowy, dodaj go
+            //         newPoints.push(points[i]);
+            //         inLine = false; // Reset flagi
+            //     } else {
+            //         // Jeśli punkt jest współliniowy
+            //         if (!inLine) {
+            //             // Dodaj początek serii (pierwszy punkt z serii)
+            //             newPoints.push(points[i - 1]);
+            //             inLine = true; // Oznacz, że jesteśmy w serii
+            //         }
+            //     }
+            // }
+            // newPoints.push(points.at(-1));
+
+            return {
+                // points: newPoints,
+                // points: points.filter((_, i) => newIndexes.includes(i) || newIndexes.includes(i+1) || newIndexes.includes(i-1)),
+                // points: newIndexes.flatMap((pi, i, arr) => [arr.at(i - 1) !== pi - 1 ? points.at(pi-1) : false, points.at(pi), arr.at(i + 1) !== pi + 1 ? points.at(pi+1) : false].filter(x => x)),
+                points: points.filter((_, i) => newIndexes.includes(i)),
+                color: face.color
             }
         }
 
@@ -252,6 +320,22 @@
             const z = u * v0.z + v * v1.z + w * v2.z;
 
             return {x, y, z}
+        }
+
+        function areCollinear3D(p1, p2, p3) {
+            // Wektory
+            let v1 = createVector(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
+            let v2 = createVector(p3.x - p1.x, p3.y - p1.y, p3.z - p1.z);
+
+            // Iloczyn wektorowy
+            let crossProduct = createVector(
+                v1.y * v2.z - v1.z * v2.y,
+                v1.z * v2.x - v1.x * v2.z,
+                v1.x * v2.y - v1.y * v2.x
+            );
+
+            // Norma iloczynu wektorowego
+            return crossProduct.mag() < 0.0001;
         }
 
         function drawLine(points) {
