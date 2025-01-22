@@ -12,7 +12,8 @@
         background-color: #1b1b1b;
       }
     </style>
-    <script src="./p5.js"></script>
+    <script src="https://davepagurek.com/stuff/p5/p5-2.0-b1.min.js"></script>
+<!--    <script src="./p5.js"></script>-->
     <script>
         let house, field;
         const camDistance = 600, camRotateSpeed = 0.5;
@@ -57,14 +58,25 @@
                 plane(200, 200)
                 pop()
             })
+            const test = buildGeometry(() => {
+                push()
+                fill('blue')
+                translate(0, 100, 0)
+                rotateX(90)
+                plane(100, 100)
+                fill('green')
+                translate(0, 0, 100)
+                plane(100, 100)
+                pop()
+            })
             setInterval(() => {
                 currentFrameRate = round(frameRate())
                 // console.log(currentFrameRate)
             }, 1000)
 
             background(200);
-            [field].forEach(obj => {
-                obj.faces.slice(1).reduce((arr, el) => {
+            [field, house].forEach(obj => {
+                obj.faces.reduce((arr, el) => {
                     if (arr.some(x => x.every(v => el.includes(v)) && x.length === el.length)) {
                         return arr
                     }
@@ -75,17 +87,15 @@
                     simplifiedFaces.push(simplifyPointsOnFace(data))
                 })
             })
-            totalPoints = faces.reduce((acc, f) => acc + f.points.length, 0)
+            // console.log(faces)
             // strokeWeight(lineWidth)
             // drawLine(faces[0].points.slice(-3))
         }
 
-        let totalPoints = 0
-
         let faces = []
         let simplifiedFaces = []
-        let step = 0;
-        let faceIndex = 0;
+        let step = 0; // step is index of point in current face
+        let faceIndex = 0; // current face index
         let currentFaces = [];
         const facesInSameTime = 3;
         // both speed index have to be integer, higer frame skip slows down, higher steps increment accelerates
@@ -95,8 +105,8 @@
         const linesGap = 5;
         const distanceBetweenPoints = lineWidth + linesGap;
 
-        const DRAW_POINTS_INSTEAD_OF_ANIMATION = true;
-        const DO_NOT_SLOW_DOWN_WITH_FRAME_RATE = false;
+        const DRAW_POINTS_INSTEAD_OF_ANIMATION = false;
+        const DO_NOT_SLOW_DOWN_WITH_FRAME_RATE = true;
 
         function draw() {
             orbitControl()
@@ -109,11 +119,17 @@
                 strokeWeight(1)
                 for (let f = 0; f < usedFaces.length; f++) {
                     beginShape();
-                    for (let i = 0; i < usedFaces[f].points.length; i++) {
-                        const v = usedFaces[f].points[i]
-                        // curveVertex(v.x, v.y, v.z)
-                        drawPoint(v, v.color)
-                        drawText(i, v)
+                    stroke(usedFaces[f].color)
+                    const points = usedFaces[f].points
+                    for (let i = 0; i < points.length; i++) {
+                        const v = points[i]
+                        const useCurve = points[i]?.last || points[i-1]?.last || points[i+1]?.last
+                        if(useCurve)
+                            curveVertex(v.x, v.y, v.z)
+                        else
+                            vertex(v.x, v.y, v.z)
+                        // drawPoint(v)
+                        // drawText(i, v)
                     }
                     endShape();
                 }
@@ -122,31 +138,28 @@
 
             /*
             TODO
-            zwielokrotnić żeby było kilka ścian jednoczesnie
+            zwielokrotnić żeby było rysowanych kilka ścian jednocześnie
              */
+
+            let log = ''
             for (let f = 0; f <= faceIndex; f++) {
-                const usedFaces = faces // simplifiedFaces
-                stroke(usedFaces[f].color)
+                const usedFaces = f < faceIndex ? simplifiedFaces : faces
                 beginShape();
-                // if(f < faceIndex)
-                //     then use simplified version of face's points
+                stroke(usedFaces[f].color)
                 const lastStep = f === faceIndex ? step : usedFaces[f].points.length
+                log += usedFaces.length
+                const points = usedFaces[f].points
                 for (let i = 0; i < lastStep; i++) {
-                    const v = usedFaces[f].points[i]
-                    curveVertex(v.x, v.y, v.z)
+                    const v = points[i]
+                    const useCurve = points[i]?.last || points[i-1]?.last || points[i+1]?.last
+                    if(useCurve)
+                        curveVertex(v.x, v.y, v.z)
+                    else
+                        vertex(v.x, v.y, v.z)
                     // drawPoint(faces[f].points[i], faces[f].color)
                 }
                 endShape();
             }
-
-            // step = frameCount % totalPoints
-            // for (faceIndex = 0; faceIndex < faces.length; faceIndex++) {
-            //     if (step < faces[faceIndex].points.length) {
-            //         break;
-            //     }
-            //     step -= faces[faceIndex].points.length
-            // }
-
 
             if (frameCount % speedIndexFrameSkip === 0) {
                 if (DO_NOT_SLOW_DOWN_WITH_FRAME_RATE)
@@ -227,7 +240,7 @@
                     seriesStart = removeIndexes[i];
                 }
 
-                // Jeśli koniec serii (kolejny indeks nie jest ciągły) lub ostatni element
+                // Jeśli koniec serii (kolejny indeks nie jest blisko)
                 if (removeIndexes[i + 1] !== removeIndexes[i] + 1) {
                     // Dodaj wszystkie poza pierwszym i ostatnim z serii
                     for (let j = seriesStart + 1; j < removeIndexes[i]; j++) {
@@ -277,10 +290,10 @@
                         x: (last.x + newOne.x) / 2,
                         y: (last.y + newOne.y) / 2,
                         z: (last.z + newOne.z) / 2,
-                        color: 'red'
+                        last: true
                     })
                 } else
-                    points.push({...calculatePoint(...newVertices, density, i, j), color: 'green'})
+                    points.push({...calculatePoint(...newVertices, density, i, j), last: false})
 
                 lastWasEdge = j === 0 || j === density - i
             }
@@ -380,8 +393,9 @@
 
         function drawPoint(v, color) {
             push()
-            fill(color)
-            stroke(color)
+            const c = color || (v.last ? 'red' : 'green')
+            fill(c)
+            stroke(c)
             translate(v.x, v.y, v.z)
             sphere(1)
             pop()
